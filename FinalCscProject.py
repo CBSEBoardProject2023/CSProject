@@ -34,9 +34,39 @@ class project:
         self.mycursor.execute('use city_library')
         self.mycursor.execute("create table if not exists employee_details(emp_id int(4) not null primary key, name varchar(30) not null, age int(2), occupation varchar(20), date_of_joining date, contact_info char(12), salary int(5))")
         self.mycursor.execute("create table if not exists book_details(book_id int(4) not null primary key, name varchar(30) not null, author varchar(30), publisher varchar(20), date_of_purchase date,cost_of_purchase int(5),copies int(2))")
-        self.mycursor.execute("create table if not exists purchase_rent_details(sl_no int(4) not null primary key, name varchar(30) not null, contact_info char(12), address varchar(40), status varchar(10), date_of_rent_or_purchase date, cost_of_rent_or_purchase int(5), date_of_return date null, Book_id int(4) references book_details(book_id), User_id int default null references user_details(user_id))")
-        self.mycursor.execute("create table if not exists user_details(user_id int not null primary key, user_name varchar(30), username varchar(20) not null unique, password varchar(20) not null)")
-
+        self.mycursor.execute("create table if not exists purchase_rent_details(sl_no int(4) not null primary key, name varchar(30) not null, contact_info char(12), address varchar(40), status varchar(10), date_of_rent_or_purchase date, cost_of_rent_or_purchase int(5), date_of_return date null, Book_id int(4) references book_details(book_id), User_id int references user_details(user_id))")
+        self.mycursor.execute("create table if not exists user_details(user_id int not null primary key, user_name varchar(30), username varchar(20) not null unique, password varchar(20) not null, emp_id int(4) references employee_details(emp_id))")
+        try:
+            self.mycursor.execute("insert into user_details values(1,'Admin','Admin','Lib@)23',1);")
+            self.myconnect.commit()
+        except:
+            pass
+        while True:
+            self.user = input("Enter your username: ")
+            if self.user == "Admin":
+                password = input("Enter your password: ")
+                if password == 'Lib@)23':
+                    print("Logged in as Admin")
+                    self.is_admin = True
+                    self.logged_in = True
+                    break
+                else:
+                    print("Incorrect uername or password")
+                    self.logged_in = False
+            else:
+                password = input("Enter your password: ")
+                self.mycursor.execute("select password from user_details where username='{0}'".format(self.user))
+                k = self.mycursor.fetchall()
+                if k == []:
+                    print("Incorrect uername or password")
+                    self.logged_in = False
+                elif password == k[0][0]:
+                    self.is_admin = False
+                    self.logged_in = True
+                    break
+                else:
+                    print("Incorrect uername or password")
+                    self.logged_in = False
     #creating functions for library management system
 
     def userid(self):
@@ -84,10 +114,16 @@ class project:
                 print("Invalid Date Format (yyyy-mm-dd)")
     def get_book_id(self, name):
         self.mycursor.execute("select book_id from book_details where name='{0}'".format(name))
-        return int(self.mycursor.fetchone[0])
+        try:
+            return int(self.mycursor.fetchone()[0])
+        except:
+            pass
     def get_user_id(self, name):
-        self.mycursor.execute("select user_id from user_details where name='{0}'".format(name))
-        return int(self.mycursor.fetchone[0])
+        self.mycursor.execute("select user_id from user_details where username='{0}'".format(name))
+        try:
+            return int(self.mycursor.fetchone()[0])
+        except:
+            pass
     #1. Employee Details
     #1.1 Add new one
     def employeedetails(self, name,age,occupation,date_of_joining,contact_info,salary):
@@ -162,7 +198,7 @@ class project:
         #     copies=records[i][6]
         #     print(f"Details\n\nID: {book_id}\nName: {book_name}\nAuthor: {author}\nPublisher: {publisher}\nDate of Purchase: {DOP}\nPurchase Cost: {purchase_cost}\nNo of Copies: {copies}")
 
-#2.3 
+#2.3 Update details of book
     def update_book_record(self,name,field,value):
         if field in ['book_id','copies','cost_of_purchase']:
             self.mycursor.execute("update book_details set {0}={1} where name='{2}'".format(field,int(value),name))
@@ -193,14 +229,11 @@ class project:
 
 #3 Purchase Details
 #3.1 Add new one to inventory
-    def purchdetails(self,name,book_name,contact_info,address,status,purchase_date,cost,date_of_return,username="Null"):
+    def purchdetails(self,name,book_name,contact_info,address,status,purchase_date,cost,date_of_return = "Null"):
         count=self.purchase_id()
         if date_of_return != "Null":
             date_of_return = "'"+date_of_return+"'"
-        if username == "Null":
-            self.mycursor.execute("insert into purchase_rent_details values({0},'{1}','{2}','{3}','{4}','{5}',{6},{7},{8})".format(count+1,name,contact_info,address,status,purchase_date,cost,date_of_return,str(self.get_book_id(book_name))))
-        else:
-            self.mycursor.execute("insert into purchase_rent_details values({0},'{1}','{2}','{3}','{4}','{5}',{6},{7},{8},'{9}')".format(count+1,name,contact_info,address,status,purchase_date,cost,date_of_return,str(self.get_book_id(book_name)),self.get_user_id(username)))
+        self.mycursor.execute("insert into purchase_rent_details values({0},'{1}','{2}','{3}','{4}','{5}',{6},{7},{8},'{9}')".format(count+1,name,contact_info,address,status,purchase_date,cost,date_of_return,str(self.get_book_id(book_name)),self.get_user_id(self.user)))
         self.myconnect.commit()
         print('Record added')
 
@@ -208,81 +241,94 @@ class project:
     def display_purch_details(self,name1):
         self.mycursor.execute("select * from purchase_rent_details where name='%s'"%(name1))
         records=self.mycursor.fetchall() # Check Kar
-        print(tabulate(records,headers = ["ID", "Name", "Author", "Publisher","Date Of Purchase", "Purchase Cost", "No of Copies"]))
+        print(tabulate(records,headers = ["ID", "Name", "Contact Information", "Address", "Status","Purchase/Rent Date" , "Purchase/Rent Cost", "Date of Return","Book ID","User ID"]))
 
     #3.3 Update purch records
     def update_purch_record(self,name,field,value):
-        if field in ['sl_no','cost','cost_of_purchase']:
-            self.mycursor.execute("update book_details set {0}={1} where name='{2}'".format(field,int(value),name))
+        if field in ['sl_no','Book_id','cost_of_rent_or_purchase','User_id']:
+            self.mycursor.execute("update purchase_rent_details set {0}={1} where name='{2}'".format(field,int(value),name))
             self.myconnect.commit()
         else:
-            self.mycursor.execute("update book_details set {0}='{1}' where name='{2}'".format(field,str(value),name))
+            self.mycursor.execute("update purchase_rent_details set {0}='{1}' where name='{2}'".format(field,str(value),name))
             self.myconnect.commit()
         print('Record Updated')
 
     #3.4 Delete record
-    def delete_purch_record(self,name1):# name 1 is name of person
-        self.mycursor.execute("select * from purchase_rent_details join book_details on purchase_rent_details.Book_id = book_details.book_id where name='"+name1+"'")
+    def delete_purch_record(self,sl_no):# name 1 is name of person
+        self.mycursor.execute("select * from purchase_rent_details join book_details on purchase_rent_details.Book_id = book_details.book_id where purchase_rent_details.sl_no='"+sl_no+"'")
         row=self.mycursor.fetchall()
         for i in range(len(row)):
+            name1=row[i][1]
             purchid=row[i][0]
-            book_name=row[i][5]
-            date_of_purchase=row[i][10]
+            book_name=row[i][11]
+            date_of_purchase=row[i][5]
         print(f"Details\n\nID: {purchid}\nName: {name1}\nBook Name: {book_name}\nDate of Purchase: {date_of_purchase}")
         p=input('Do you wish to proceed with the action (y/n): ')
         if p.lower()=='y':
-            self.mycursor.execute("delete from purchase_rent_details where name='"+name1+"'")
+            self.mycursor.execute("delete from purchase_rent_details where sl_no='"+sl_no+"'")
             self.myconnect.commit()
             print("Record deleted")
         else:
             print("ACTION CANCELLED")
 
     #3.5 Exit - In Main Loop
-    #4 IDEK Name 
-    #4.1
-    def userdetails(self,name,user_name,password):
-        count=self.userid()
-        self.mycursor.execute("insert into user_details values({0},'{1}','{2}','{3}')".format(count+1,name,user_name,password))
-        self.myconnect.commit()
-        print('Record added')
-    #4.2
+    #4 User Details
+    #4.1 Add a user
+    def userdetails(self,name,user_name,password,emp_id):
+        if self.is_admin:
+            count=self.userid()
+            self.mycursor.execute("insert into user_details values({0},'{1}','{2}','{3}',{4})".format(count+1,name,user_name,password,emp_id))
+            self.myconnect.commit()
+            print('Record added')
+        else:
+            print("You need to be admin for this action")
+    #4.2 Display user details
     def display_user_details(self,name):
-        self.mycursor.execute("select * from user_details where name='%s'"%(name))
+        self.mycursor.execute("select * from user_details where username='%s'"%(name))
         records=self.mycursor.fetchall()
-        while True:
+        if self.is_admin:
             passwd=input("Would you like to know passwords as well? (Y/n) : ")
             if passwd in 'Yy':
-                print(tabulate(records,headers = ["ID", "Name", "Username", "Password"]))
-                break
-            elif passwd in 'Nn':
+                print(tabulate(records,headers = ["ID", "Name", "Username", "Password","Employee ID"]))
+            else:
                 mod_records=[]
                 for i in records:
-                    mod_records.append([i[0],i[1],i[2]])
-                print(tabulate(mod_records,headers = ["ID", "Name", "Username"]))
-                break
-            else:
-                print("Wrong input")
-    #4.3
+                    mod_records.append([i[0],i[1],i[2],i[4]])
+                print(tabulate(mod_records,headers = ["ID", "Name", "Username","Employee ID"]))
+        else:
+            mod_records=[]
+            for i in records:
+                mod_records.append([i[0],i[1],i[2],i[4]])
+            print(tabulate(records,headers = ["ID", "Name", "Username", "Employee ID"]))
+    #4.3 Update user details
     def update_user_details(self,username,field,value):
-        if field in ['user_id']:
-            self.mycursor.execute("update user_details set {0}={1} where username='{2}'".format(field,int(value),username))
-            self.myconnect.commit()
+        if self.is_admin:
+            if field in ['user_id']:
+                self.mycursor.execute("update user_details set {0}={1} where username='{2}'".format(field,int(value),username))
+                self.myconnect.commit()
+            else:
+                self.mycursor.execute("update user_details set {0}='{1}' where username='{2}'".format(field,str(value),username))
+                self.myconnect.commit()
+            print('Record Updated')
         else:
-            self.mycursor.execute("update user_details set {0}='{1}' where username='{2}'".format(field,str(value),username))
-            self.myconnect.commit()
-        print('Record Updated')
-    #4.4
+            print("You need to be admin for this action")
+    #4.4 Delete user details
     def delete_user_record(self,username):
-        self.mycursor.execute("select * from user_details where username='"+username+"'")
-        row=self.mycursor.fetchall()
-        for i in range(len(row)):
-            uid=row[i][0]
-            name=row[i][2]
-        print(f"Details\n\nUser ID: {uid}\nName: {name}\nUsername: {username}")
-        p=input('Do you wish to proceed with the action (y/n): ')
-        if p.lower()=='y':
-            self.mycursor.execute("delete from user_details where username='"+username+"'")
-            self.myconnect.commit()
-            print("Record deleted")
+        if self.is_admin:
+            self.mycursor.execute("select * from user_details where username='"+username+"'")
+            row=self.mycursor.fetchall()
+            for i in range(len(row)):
+                uid=row[i][0]
+                name=row[i][2]
+                emp_id=row[i][4]
+            print(f"Details\n\nUser ID: {uid}\nName: {name}\nUsername: {username}\nEmployee ID: {emp_id}")
+            p=input('Do you wish to proceed with the action (y/n): ')
+            if p.lower()=='y':
+                self.mycursor.execute("delete from user_details where username='"+username+"'")
+                self.myconnect.commit()
+                print("Record deleted")
+            else:
+                print("ACTION CANCELLED")
         else:
-            print("ACTION CANCELLED")
+            print("You need to be admin for this action")
+        #4.5 Exit - In Main Loop
